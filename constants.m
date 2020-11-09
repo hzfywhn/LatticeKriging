@@ -4,7 +4,7 @@ function [y, W, Z, phi, Q] = constants(obs, basis, normalization, rho, derivativ
 
     Z = covariate(obs.loc);
     if derivative
-        Z = covariate(repmat(obs.loc, 1, size(obs.loc, 2)));
+        Z = covariate(repmat(obs.loc, size(obs.loc, 2), 1));
     end
 
     [phi, Q] = combineMR(obs.loc, basis, rho, derivative);
