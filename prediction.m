@@ -1,15 +1,11 @@
-function [m, sd] = prediction(loc, basis, normalization, rho, lambda, Z, phi, Q, M, d, c, rhoMLE)
-    Z1 = covariate(loc);
-    [phi1, ~] = combineMR(loc, basis, rho, false);
+function [m, sd] = prediction(loc, basis, normalization, rho, lambda, Z, Q, phi, M, d, c, rhoMLE)
+    Z1 = [ones(size(loc, 1), 1) loc];
+    [~, phi1] = combineMR(loc, basis, normalization, rho, false);
 
     [Qc, flag] = chol(Q);
     assert(flag == 0)
-    normweight = rho * sum((Qc' \ phi1').^2, 1);
+    normweight = sum((Qc' \ phi1').^2, 1);
     assert(all(normweight ~= 0))
-    if normalization
-        ind = 1: length(normweight);
-        phi1 = sparse(ind, ind, 1./sqrt(normweight)) * phi1;
-    end
 
     m = Z1*d + phi1*c;
 

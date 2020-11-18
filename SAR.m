@@ -25,5 +25,5 @@ function [ia, ja, a] = SAR(basis)
 
     ia = ia(1: k-1);
     ja = ja(1: k-1);
-    a = a(1: k-1) / sqrt(basis.alpha);
+    a = a(1: k-1);
 end

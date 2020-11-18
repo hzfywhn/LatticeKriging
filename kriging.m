@@ -1,4 +1,4 @@
-function [d, c, rhoMLE, likelihood, M] = kriging(lambda, y, W, Z, phi, Q)
+function [d, c, rhoMLE, likelihood, M] = kriging(lambda, y, W, Z, Q, phi)
     n = length(y);
 
     M = phi * (Q \ phi') + lambda * inv(W);
@@ -10,5 +10,6 @@ function [d, c, rhoMLE, likelihood, M] = kriging(lambda, y, W, Z, phi, Q)
 
     [Mc, flag, ~] = chol(M);
     assert(flag == 0)
-    likelihood = -n/2 - n/2*log(rhoMLE) - sum(log(diag(Mc))) - n/2*log(2*pi);
+    detM_2 = sum(log(diag(Mc)));
+    likelihood = -n/2 - n/2*log(rhoMLE) - detM_2 - n/2*log(2*pi);
 end

@@ -1,20 +1,14 @@
-function [y, W, Z, phi, Q] = constants(obs, basis, normalization, rho, derivative)
+function [y, W, Z, Q, phi] = constants(obs, basis, normalization, rho, derivative)
     y = obs.val(:);
-    W = errorCov(obs.err(:));
+    ind = 1: length(obs.err);
+    W = sparse(ind, ind, 1./obs.err(:).^2);
 
-    Z = covariate(obs.loc);
+    [n, ndim] = size(obs.loc);
+    one = ones(n, 1);
+    Z = [one obs.loc];
     if derivative
-        Z = covariate(repmat(obs.loc, size(obs.loc, 2), 1));
+        Z = [one repmat(obs.loc, ndim, 1)];
     end
 
-    [phi, Q] = combineMR(obs.loc, basis, rho, derivative);
-
-    if normalization
-        [Qc, flag] = chol(Q);
-        assert(flag == 0)
-        normweight = rho * sum((Qc' \ phi').^2, 1);
-        assert(all(normweight ~= 0))
-        ind = 1: length(normweight);
-        phi = sparse(ind, ind, 1./sqrt(normweight)) * phi;
-    end
+    [Q, phi] = combineMR(obs.loc, basis, normalization, rho, derivative);
 end

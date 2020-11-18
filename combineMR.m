@@ -1,4 +1,4 @@
-function [phi, Q] = combineMR(loc, basis, rho, derivative)
+function [Q, phi] = combineMR(loc, basis, normalization, rho, derivative)
     [n, ndim] = size(loc);
     nlev = length(basis);
 
@@ -7,45 +7,62 @@ function [phi, Q] = combineMR(loc, basis, rho, derivative)
         nr = ndim * n;
     end
 
-    m = 0;
+    m0 = zeros(1, nlev);
     for ilev = 1: nlev
-        m = m + size(basis{ilev}.loc, 1);
+        m0(ilev) = size(basis{ilev}.loc, 1);
     end
+    m1 = cumsum([0 m0]);
+    m = m1(nlev+1);
+
+    iB = zeros(1, m^2);
+    jB = zeros(1, m^2);
+    B = zeros(1, m^2);
 
     iphi = zeros(1, nr*m);
     jphi = zeros(1, nr*m);
     phi = zeros(1, nr*m);
 
-    iQ = zeros(1, m^2);
-    jQ = zeros(1, m^2);
-    Q = zeros(1, m^2);
-
+    kB = 1;
     kphi = 1;
-    kQ = 1;
     for ilev = 1: nlev
+        [iB0, jB0, B0] = SAR(basis{ilev});
         [iphi0, jphi0, phi0] = regression(loc, basis{ilev}, derivative);
+
+        if normalization
+            B1 = sparse(iB0, jB0, B0, m0(ilev), m0(ilev));
+            Q1 = B1' * B1;
+            phi1 = sparse(iphi0, jphi0, phi0, nr, m0(ilev));
+            [Qc, flag] = chol(Q1);
+            assert(flag == 0)
+            normweight = sum((Qc' \ phi1').^2, 1);
+            assert(all(normweight ~= 0))
+            ind = 1: length(normweight);
+            phi1 = sparse(ind, ind, 1./sqrt(normweight)) * phi1;
+            [iphi0, jphi0, phi0] = find(phi1);
+        end
+
+        k0 = length(B0);
+        iB(kB: kB+k0-1) = iB0 + m1(ilev);
+        jB(kB: kB+k0-1) = jB0 + m1(ilev);
+        B(kB: kB+k0-1) = B0;
+        kB = kB + k0;
+
         k0 = length(phi0);
         iphi(kphi: kphi+k0-1) = iphi0;
-        jphi(kphi: kphi+k0-1) = jphi0;
-        phi(kphi: kphi+k0-1) = phi0;
+        jphi(kphi: kphi+k0-1) = jphi0 + m1(ilev);
+        phi(kphi: kphi+k0-1) = phi0 * sqrt(basis{ilev}.alpha);
         kphi = kphi + k0;
-
-        [iQ0, jQ0, Q0] = precision(basis{ilev}, rho);
-        k0 = length(Q0);
-        iQ(kQ: kQ+k0-1) = iQ0;
-        jQ(kQ: kQ+k0-1) = jQ0;
-        Q(kQ: kQ+k0-1) = Q0;
-        kQ = kQ + k0;
     end
+
+    iB = iB(1: kB-1);
+    jB = jB(1: kB-1);
+    B = B(1: kB-1);
 
     iphi = iphi(1: kphi-1);
     jphi = jphi(1: kphi-1);
-    phi = phi(1: kphi-1);
+    phi = phi(1: kphi-1) * sqrt(rho);
 
-    iQ = iQ(1: kQ-1);
-    jQ = jQ(1: kQ-1);
-    Q = Q(1: kQ-1);
-
+    B = sparse(iB, jB, B, m, m);
+    Q = B' * B;
     phi = sparse(iphi, jphi, phi, nr, m);
-    Q = sparse(iQ, jQ, Q, m, m);
 end
