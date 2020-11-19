@@ -54,19 +54,19 @@ basis{1}.alpha = 1;
 normalization = true;
 rho = 1;
 derivative = true;
-[y, W, Z, phi, Q] = constants(obs, basis, normalization, rho, derivative);
-lambda = optimize(y, W, Z, phi, Q, exp(-9), exp(5), 5e-3);
-[d, c, rhoMLE, likelihood, M] = kriging(lambda, y, W, Z, phi, Q);
+[y, W, Z, Q, phi] = constants(obs, basis, normalization, rho, derivative);
+lambda = optimize(y, W, Z, Q, phi, exp(-9), exp(5), 5e-3);
+[d, c, rhoMLE, likelihood, M] = kriging(lambda, y, W, Z, Q, phi);
 
 delta = pi/180;
 x0 = -pi*2/9: delta: pi*2/9;
 y0 = -pi*2/9: delta: pi*2/9;
 [y, x] = meshgrid(y0, x0);
-[m, sd] = prediction([x(:) y(:)], basis, normalization, rho, lambda, Z, phi, Q, M, d, c, rhoMLE);
+[m, sd] = prediction([x(:) y(:)], basis, normalization, rho, lambda, Z, Q, phi, M, d, c, rhoMLE);
 
-function lambda = optimize(y, W, Z, phi, Q, xmin, xmax, tol)
+function lambda = optimize(y, W, Z, Q, phi, xmin, xmax, tol)
     function likelihood = LK(l)
-        [~, ~, ~, likelihood] = kriging(exp(l), y, W, Z, phi, Q);
+        [~, ~, ~, likelihood] = kriging(exp(l), y, W, Z, Q, phi);
         likelihood = -likelihood;
     end
     lambda = exp(fminbnd(@LK, log(xmin), log(xmax), optimset('FunValCheck', 'on', 'TolX', tol)));
