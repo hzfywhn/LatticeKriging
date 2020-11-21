@@ -10,8 +10,12 @@ y0 = y1: delta: y2;
 z = 1 ./ (1 + (x-1).^2 + y.^2) - 1 ./ (1 + (x+1).^2 + y.^2);
 vx = -2*(x-1) ./ (1 + (x-1).^2 + y.^2).^2 + 2*(x+1) ./ (1 + (x+1).^2 + y.^2).^2;
 vy = -2*y ./ (1 + (x-1).^2 + y.^2).^2 + 2*y ./ (1 + (x+1).^2 + y.^2).^2;
+v = sqrt(vx.^2 + vy.^2);
+cosx = vx ./ v;
+cosy = vy ./ v;
 obs.loc = [x(:) y(:)];
-obs.val = z(:);
+obs.azim = [cosx(:) cosy(:)];
+obs.val = v(:);
 obs.err = ones(numel(z), 1);
 
 basis = cell(2);
@@ -82,7 +86,7 @@ basis{2}.alpha = 0.2;
 
 normalization = true;
 rho = 1;
-derivative = false;
+derivative = true;
 [y, W, Z, Q, phi] = constants(obs, basis, normalization, rho, derivative);
 lambda = optimize(y, W, Z, Q, phi, exp(-9), exp(5), 5e-3);
 [d, c, rhoMLE, likelihood, M] = kriging(lambda, y, W, Z, Q, phi);

@@ -1,5 +1,5 @@
-superdarn = readmatrix('E_superdarn.txt');
-empirical = readmatrix('E_empirical.txt');
+superdarn = readmatrix('superdarn.txt');
+empirical = readmatrix('empirical.txt');
 
 outline = alphaShape(superdarn(1, :)', superdarn(2, :)');
 valid = ~inShape(outline, empirical(1, :), empirical(2, :));
@@ -10,13 +10,14 @@ len_empirical = size(empirical, 2);
 
 x = [superdarn(1, :) empirical(1, :)]';
 y = [superdarn(2, :) empirical(2, :)]';
-vx = [superdarn(3, :) empirical(3, :)]';
-vy = [superdarn(4, :) empirical(4, :)]';
-vxe = [ones(len_superdarn, 1); ones(len_empirical, 1)];
-vye = [ones(len_superdarn, 1); ones(len_empirical, 1)];
+cosx = [superdarn(3, :) empirical(3, :)]';
+cosy = [superdarn(4, :) empirical(4, :)]';
+v = [superdarn(5, :) empirical(5, :)]';
+ve = [ones(len_superdarn, 1); ones(len_empirical, 1)];
 obs.loc = [x y];
-obs.val = [vx vy];
-obs.err = [vxe vye];
+obs.azim = [cosx cosy];
+obs.val = v;
+obs.err = ve;
 
 delta = pi/60;
 x0 = -pi/3: delta: pi/3;
@@ -57,6 +58,18 @@ derivative = true;
 [y, W, Z, Q, phi] = constants(obs, basis, normalization, rho, derivative);
 lambda = optimize(y, W, Z, Q, phi, exp(-9), exp(5), 5e-3);
 [d, c, rhoMLE, likelihood, M] = kriging(lambda, y, W, Z, Q, phi);
+
+valid = x.^2 + y.^2 <= (pi*2/9)^2;
+scatter(x(valid), y(valid), [], -m(valid(:)), 'filled')
+hold on
+quiver(superdarn(1, :), superdarn(2, :), superdarn(5, :).*superdarn(3, :), superdarn(5, :).*superdarn(4, :), 2, 'k')
+quiver(empirical(1, :), empirical(2, :), empirical(5, :).*empirical(3, :), empirical(5, :).*empirical(4, :), 2, 'm')
+hold off
+axis([-pi*2/9 pi*2/9 -pi*2/9 pi*2/9])
+cmax = max(abs(m));
+caxis([-cmax cmax])
+colormap('jet')
+colorbar
 
 delta = pi/180;
 x0 = -pi*2/9: delta: pi*2/9;

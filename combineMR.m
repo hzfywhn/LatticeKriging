@@ -1,11 +1,6 @@
-function [Q, phi] = combineMR(loc, basis, normalization, rho, derivative)
-    [n, ndim] = size(loc);
+function [Q, phi] = combineMR(obs, basis, normalization, rho, derivative)
+    n = size(obs.loc, 1);
     nlev = length(basis);
-
-    nr = n;
-    if derivative
-        nr = ndim * n;
-    end
 
     m0 = zeros(1, nlev);
     for ilev = 1: nlev
@@ -18,20 +13,20 @@ function [Q, phi] = combineMR(loc, basis, normalization, rho, derivative)
     jB = zeros(1, m^2);
     B = zeros(1, m^2);
 
-    iphi = zeros(1, nr*m);
-    jphi = zeros(1, nr*m);
-    phi = zeros(1, nr*m);
+    iphi = zeros(1, n*m);
+    jphi = zeros(1, n*m);
+    phi = zeros(1, n*m);
 
     kB = 1;
     kphi = 1;
     for ilev = 1: nlev
         [iB0, jB0, B0] = SAR(basis{ilev});
-        [iphi0, jphi0, phi0] = regression(loc, basis{ilev}, derivative);
+        [iphi0, jphi0, phi0] = regression(obs, basis{ilev}, derivative);
 
         if normalization
             B1 = sparse(iB0, jB0, B0, m0(ilev), m0(ilev));
             Q1 = B1' * B1;
-            phi1 = sparse(iphi0, jphi0, phi0, nr, m0(ilev));
+            phi1 = sparse(iphi0, jphi0, phi0, n, m0(ilev));
             [Qc, flag] = chol(Q1);
             assert(flag == 0)
             normweight = sum((Qc' \ phi1').^2, 1);
@@ -64,5 +59,5 @@ function [Q, phi] = combineMR(loc, basis, normalization, rho, derivative)
 
     B = sparse(iB, jB, B, m, m);
     Q = B' * B;
-    phi = sparse(iphi, jphi, phi, nr, m);
+    phi = sparse(iphi, jphi, phi, n, m);
 end
