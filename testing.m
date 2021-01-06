@@ -13,12 +13,7 @@ vy = -2*y ./ (1 + (x-1).^2 + y.^2).^2 + 2*y ./ (1 + (x+1).^2 + y.^2).^2;
 v = sqrt(vx.^2 + vy.^2);
 cosx = vx ./ v;
 cosy = vy ./ v;
-obs.loc = [x(:) y(:)];
-obs.azim = [cosx(:) cosy(:)];
-obs.val = v(:);
-obs.err = ones(numel(v), 1);
-
-basis = cell(1);
+obs = struct('loc', [x(:) y(:)], 'azim', [cosx(:) cosy(:)], 'val', v(:), 'err', ones(numel(v), 1));
 
 delta = 0.2;
 x0 = x1: delta: x2;
@@ -46,43 +41,7 @@ for j = 1: ny
         end
     end
 end
-basis{1}.loc = loc;
-basis{1}.connect = con;
-basis{1}.centerweight = 4.01;
-basis{1}.delta = delta * 2.5;
-basis{1}.alpha = 1;
-
-% delta = 0.1;
-% x0 = x1: delta: x2;
-% y0 = y1: delta: y2;
-% nx = length(x0);
-% ny = length(y0);
-% loc = zeros(nx*ny, 2);
-% con = nan(nx*ny, 4);
-% for j = 1: ny
-%     for i = 1: nx
-%         idx = (j-1)*nx + i;
-%         loc(idx, 2) = y0(j);
-%         loc(idx, 1) = x0(i);
-%         if j >= 2
-%             con(idx, 1) = (j-2)*nx + i;
-%         end
-%         if i >= 2
-%             con(idx, 2) = (j-1)*nx + i-1;
-%         end
-%         if j <= ny-1
-%             con(idx, 3) = j*nx + i;
-%         end
-%         if i <= nx-1
-%             con(idx, 4) = (j-1)*nx + i+1;
-%         end
-%     end
-% end
-% basis{2}.loc = loc;
-% basis{2}.connect = con;
-% basis{2}.centerweight = 4.01;
-% basis{2}.delta = delta * 2.5;
-% basis{2}.alpha = 0.2;
+basis = {struct('loc', loc, 'connect', con, 'centerweight', 4.01, 'delta', delta*2.5, 'alpha', 1)};
 
 normalization = false;
 rho = 1;

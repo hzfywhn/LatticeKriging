@@ -6,7 +6,7 @@ function [m, sd] = prediction(loc, basis, normalization, rho, lambda, Z, Q, phi,
     [Qc, flag] = chol(Q);
     assert(flag == 0)
     normweight = sum((Qc' \ phi1').^2, 1);
-    assert(all(normweight ~= 0))
+    normweight(normweight == 0) = 1;
 
     m = Z1*d + phi1*c;
 

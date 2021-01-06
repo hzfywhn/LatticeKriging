@@ -30,7 +30,7 @@ function [Q, phi] = combineMR(obs, basis, normalization, rho, derivative)
             [Qc, flag] = chol(Q1);
             assert(flag == 0)
             normweight = sum((Qc' \ phi1').^2, 1);
-            assert(all(normweight ~= 0))
+            normweight(normweight == 0) = 1;
             ind = 1: length(normweight);
             phi1 = sparse(ind, ind, 1./sqrt(normweight)) * phi1;
             [iphi0, jphi0, phi0] = find(phi1);
