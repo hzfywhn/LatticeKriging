@@ -1,8 +1,4 @@
-function [m, sd] = prediction(loc, basis, normalization, rho, lambda, Z, Q, phi, M, d, c, rhoMLE)
-    Z1 = [ones(size(loc, 1), 1) loc];
-    obs.loc = loc;
-    [~, phi1] = combineMR(obs, basis, normalization, rho, false);
-
+function [m, sd] = prediction(Z1, phi1, lambda, Z, Q, phi, M, d, c, rhoMLE)
     [Qc, flag] = chol(Q);
     assert(flag == 0)
     normweight = sum((Qc' \ phi1').^2, 1);
