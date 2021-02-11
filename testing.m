@@ -35,49 +35,50 @@ normalization = false;
 rho = 1;
 
 delta = 0.1;
-x0 = x1: delta: x2;
-y0 = y1: delta: y2;
-[y, x] = meshgrid(y0, x0);
-n = numel(x);
-sub = randsample(n, floor(n/10));
-x = x(sub);
-y = y(sub);
+[y, x] = meshgrid(y1: delta: y2, x1: delta: x2);
 z = 1 ./ (1 + (x-1).^2 + y.^2) - 1 ./ (1 + (x+1).^2 + y.^2);
-vx = -2*(x-1) ./ (1 + (x-1).^2 + y.^2).^2 + 2*(x+1) ./ (1 + (x+1).^2 + y.^2).^2;
-vy = -2*y ./ (1 + (x-1).^2 + y.^2).^2 + 2*y ./ (1 + (x+1).^2 + y.^2).^2;
-cosx = ones(size(vx));
-cosy = zeros(size(vy));
+vx = 2*(x-1) ./ (1 + (x-1).^2 + y.^2).^2 - 2*(x+1) ./ (1 + (x+1).^2 + y.^2).^2;
+vy = 2*y ./ (1 + (x-1).^2 + y.^2).^2 - 2*y ./ (1 + (x+1).^2 + y.^2).^2;
+n = numel(z);
+subset = randsample(n, floor(n/10));
+n = length(subset);
+x = x(subset);
+y = y(subset);
+z = z(subset);
+vx = vx(subset);
+vy = vy(subset);
+cosx = ones(n, 1);
+cosy = sqrt(1 - cosx.^2);
 v = vx.*cosx + vy.*cosy;
-obs = struct('loc', [x y], 'azim', [cosx cosy], 'val', v, 'err', ones(numel(v), 1));
 
 subplot(211)
 scatter(x, y, [], z, 'filled')
 hold on
 quiver(x, y, vx.*cosx, vy.*cosy)
 hold off
+axis([x1 x2 y1 y2])
 colorbar
 
-y = obs.val;
-ind = 1: size(obs.val, 1);
-W = sparse(ind, ind, obs.err);
-Z = ones(size(v));
-[Q, phi] = combineMR(obs, basis, normalization, rho, true);
-lambda = optimize(y, W, Z, Q, phi, exp(-9), exp(5), 5e-3);
-[d, c, rhoMLE, likelihood, M] = kriging(lambda, y, W, Z, Q, phi);
+yfit = v;
+W = sparse(1: n, 1: n, ones(n, 1));
+Z = ones(n, 1);
+[Q, phi] = combineMR(struct('loc', [x y], 'azim', [cosx cosy]), basis, normalization, rho, true);
+lambda = optimize(yfit, W, Z, Q, phi, exp(-9), exp(5), 5e-3);
+[d, c, rhoMLE, likelihood, M] = kriging(lambda, yfit, W, Z, Q, phi);
 
 delta = 0.1;
 x0 = x1: delta: x2;
 y0 = y1: delta: y2;
+nx = length(x0);
+ny = length(y0);
 [y, x] = meshgrid(y0, x0);
-z = 1 ./ (1 + (x-1).^2 + y.^2) - 1 ./ (1 + (x+1).^2 + y.^2);
-vx = -2*(x-1) ./ (1 + (x-1).^2 + y.^2).^2 + 2*(x+1) ./ (1 + (x+1).^2 + y.^2).^2;
-vy = -2*y ./ (1 + (x-1).^2 + y.^2).^2 + 2*y ./ (1 + (x+1).^2 + y.^2).^2;
 [~, phi1] = combineMR(struct('loc', [x(:) y(:)]), basis, normalization, rho, false);
-[m, sd] = prediction(ones(numel(z), 1), phi1, lambda, Z, Q, phi, M, d, c, rhoMLE);
+[m, sd] = prediction(ones(nx*ny, 1), phi1, lambda, Z, Q, phi, M, d, c, rhoMLE);
 
 subplot(212)
-h = pcolor(x, y, reshape(m, [length(x0) length(y0)]));
+h = pcolor(x, y, reshape(m, nx, ny));
 h.EdgeColor = 'none';
+axis([x1 x2 y1 y2])
 colorbar
 
 function lambda = optimize(y, W, Z, Q, phi, xmin, xmax, tol)

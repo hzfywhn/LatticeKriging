@@ -44,7 +44,7 @@ regression <- function(obs, basis, derivative) {
         r1 <- replicate(n = nrow(basis$loc), expr = rowSums(obs$loc * obs$azim))
         r2 <- obs$azim[, 1] %*% t(basis$loc[, 1])
         for (idim in 2: ncol(obs$loc)) r2 <- r2 + obs$azim[, idim] %*% t(basis$loc[, idim])
-        phi <- -(1 - d)^5 * (5*d + 1) * 56/3 / basis$delta^2 * (r1 - r2)
+        phi <- (1 - d)^5 * (5*d + 1) * 56/3 / basis$delta^2 * (r1 - r2)
     } else {
         phi <- (1 - d)^6 * (35*d^2 + 18*d + 3) / 3
     }
@@ -118,16 +118,6 @@ combineMR <- function(obs, basis, normalization, rho, derivative) {
     return (list(Q = Q, phi = phi))
 }
 
-constants <- function(obs, basis, normalization, rho, derivative) {
-    # concatenate vector observation into an array (x1 ... xn y1 ... yn ...)
-    y <- c(obs$val)
-    W <- diag.spam(x = 1/c(obs$err)^2)
-    Z <- cbind(1, obs$loc)
-    MR <- combineMR(obs, basis, normalization, rho, derivative)
-
-    return (c(list(y = y, W = W, Z = Z), MR))
-}
-
 kriging <- function(lambda, y, W, Z, Q, phi) {
     n <- length(y)
 
@@ -146,10 +136,9 @@ kriging <- function(lambda, y, W, Z, Q, phi) {
     return (list(d = drop(d), c = drop(c), rhoMLE = drop(rhoMLE), likelihood = drop(likelihood), M = M))
 }
 
-prediction <- function(loc, basis, normalization, rho, lambda, Z, Q, phi, M, d, c, rhoMLE) {
-    # no vector simulation for now
-    Z1 <- cbind(1, loc)
-    phi1 <- combineMR(list(loc = loc), basis, normalization, rho, FALSE)$phi
+prediction <- function(Z1, phi1, lambda, Z, Q, phi, M, d, c, rhoMLE) {
+    normweight <- colSums(forwardsolve(chol(Q), t(phi1))^2)
+    normweight[normweight == 0] <- 1
 
     m <- Z1 %*% d + phi1 %*% c
 
@@ -162,7 +151,7 @@ prediction <- function(loc, basis, normalization, rho, lambda, Z, Q, phi, M, d, 
     c1 <- solve(Q, t(phi)) %*% solve(M, r1)
     residual <- y1 - Z %*% d1 - phi %*% c1
     joint <- colSums(t(Z1) * solve(ZMZ, t(Z1))) - 2 * colSums(t(Z1) * d1)
-    marginal <- colSums(forwardsolve(chol(Q), t(phi1))^2) - colSums(y1 * residual) / lambda
+    marginal <- normweight - colSums(y1 * residual) / lambda
     sd <- sqrt(rhoMLE * abs(joint + marginal))
 
     return (list(m = drop(m), sd = sd))
@@ -176,30 +165,12 @@ if (FALSE) {
     y1 <- -2
     y2 <- 2
 
-    # fake observation
-    delta <- 0.1
-    x0 <- seq(from = x1, to = x2, by = delta)
-    y0 <- seq(from = y1, to = y2, by = delta)
-    loc <- expand.grid(x0, y0)
-    x <- loc[, 1]
-    y <- loc[, 2]
-    z <- 1 / (1 + (x-1)^2 + y^2) - 1 / (1 + (x+1)^2 + y^2)
-    vx <- -2*(x-1) / (1 + (x-1)^2 + y^2)^2 + 2*(x+1) / (1 + (x+1)^2 + y^2)^2
-    vy <- -2*y / (1 + (x-1)^2 + y^2)^2 + 2*y / (1 + (x+1)^2 + y^2)^2
-    v <- sqrt(vx^2 + vy^2)
-    cosx <- vx / v
-    cosy <- vy / v
-    obs <- list(loc = cbind(x, y), azim = cbind(cosx, cosy), val = v, err = array(data = 1, dim = length(v)))
-
     # basis set, column major order for comparison with original LatticeKrig package
-    basis <- vector(mode = "list", length = 1)
-
-    delta <- 0.2
+    delta <- 0.5
     x0 <- seq(from = x1, to = x2, by = delta)
     y0 <- seq(from = y1, to = y2, by = delta)
     nx <- length(x0)
     ny <- length(y0)
-    NC <- max(c(nx, ny))
     loc <- array(dim = c(nx*ny, 2))
     con <- array(dim = c(nx*ny, 4))
     for (j in 1: ny) {
@@ -213,48 +184,49 @@ if (FALSE) {
             if (i <= nx-1) con[idx, 4] <- (j-1)*nx + i+1
         }
     }
-    basis[[1]] <- list(loc = loc, connect = con, centerweight = 4.01, delta = delta*2.5, alpha = 1)
-
-    # delta <- 0.1
-    # x0 <- seq(from = x1, to = x2, by = delta)
-    # y0 <- seq(from = y1, to = y2, by = delta)
-    # nx <- length(x0)
-    # ny <- length(y0)
-    # loc <- array(dim = c(nx*ny, 2))
-    # con <- array(dim = c(nx*ny, 4))
-    # for (j in 1: ny) {
-    #     for (i in 1: nx) {
-    #         idx <- (j-1)*nx + i
-    #         loc[idx, 2] <- y0[j]
-    #         loc[idx, 1] <- x0[i]
-    #         if (j >= 2) con[idx, 1] <- (j-2)*nx + i
-    #         if (i >= 2) con[idx, 2] <- (j-1)*nx + i-1
-    #         if (j <= ny-1) con[idx, 3] <- j*nx + i
-    #         if (i <= nx-1) con[idx, 4] <- (j-1)*nx + i+1
-    #     }
-    # }
-    # basis[[2]] <- list(loc = loc, connect = con, centerweight = 4.01, delta = delta*2.5, alpha = 0.2)
+    basis <- list(list(loc = loc, connect = con, centerweight = 4.01, delta = delta*2.5, alpha = 1))
 
     normalization <- FALSE
     rho <- 1
-    derivative <- TRUE
-    cons <- constants(obs, basis, normalization, rho, derivative)
+
+    # fake observation
+    delta <- 0.1
+    loc <- expand.grid(seq(from = x1, to = x2, by = delta), seq(from = y1, to = y2, by = delta))
+    x <- loc[, 1]
+    y <- loc[, 2]
+    z <- 1 / (1 + (x-1)^2 + y^2) - 1 / (1 + (x+1)^2 + y^2)
+    vx <- -2*(x-1) / (1 + (x-1)^2 + y^2)^2 + 2*(x+1) / (1 + (x+1)^2 + y^2)^2
+    vy <- -2*y / (1 + (x-1)^2 + y^2)^2 + 2*y / (1 + (x+1)^2 + y^2)^2
+    n <- length(z)
+    subset <- sample(1: n, size = n/10)
+    n <- length(subset)
+    x <- x(subset)
+    y <- y(subset)
+    z <- z(subset)
+    vx <- vx(subset)
+    vy <- vy(subset)
+    cosx <- rep(1, times = n)
+    cosy <- sqrt(1 - cosx^2)
+    v <- vx*cosx + vy*cosy
+
+    yfit <- v
+    W <- diag.spam(x = 1, nrow = n, ncol = n)
+    Z <- rep(1, times = n)
+    MR <- combineMR(list(loc = cbind(x, y), azim = cbind(cosx, cosy)), basis, normalization, rho, TRUE)
     # interval needs to be adjusted for specific purposes
     lambda <- exp(optimize(
-        function(l) kriging(exp(l), cons$y, cons$W, cons$Z, cons$Q, cons$phi)$likelihood,
+        function(l) kriging(exp(l), yfit, W, Z, MR$Q, MR$phi)$likelihood,
         interval = c(-9, 5), maximum = TRUE, tol = 5e-3)$maximum)
-    fit <- kriging(lambda, cons$y, cons$W, cons$Z, cons$Q, cons$phi)
-    # lk <- LatticeKrig::LatticeKrig(x = obs$loc, y = obs$val, nlevel = 2,
-    #     NC = NC, NC.buffer = 0, normalize = normalization)
+    fit <- kriging(lambda, yfit, W, Z, MR$Q, MR$phi)
 
     delta <- 0.1
     x0 <- seq(from = x1, to = x2, by = delta)
     y0 <- seq(from = y1, to = y2, by = delta)
+    nx <- length(x0)
+    ny <- length(y0)
     loc <- expand.grid(x0, y0)
     x <- loc[, 1]
     y <- loc[, 2]
-    z <- 1 / (1 + (x-1)^2 + y^2) - 1 / (1 + (x+1)^2 + y^2)
-    pred <- prediction(cbind(x, y), basis, normalization, rho, lambda,
-        cons$Z, cons$Q, cons$phi, fit$M, fit$d, fit$c, fit$rhoMLE)
-    # z and pred$m should be quite close
+    MR1 <- combineMR(list(loc = cbind(x, y)), basis, normalization, rho, FALSE)
+    pred <- prediction(rep(1, times = nx*ny), MR1$phi1, lambda, Z, MR$Q, MR$phi, fit$M, fit$d, fit$c, fit$rhoMLE)
 }
