@@ -58,12 +58,13 @@ quiver(x, y, vx.*cosx, vy.*cosy)
 hold off
 axis([x1 x2 y1 y2])
 colorbar
+title('Input')
 
 yfit = v;
-W = sparse(1: n, 1: n, ones(n, 1));
+W = sparse(1: n, 1: n, 1);
 Z = ones(n, 1);
 [Q, phi] = combineMR(struct('loc', [x y], 'azim', [cosx cosy]), basis, normalization, rho, true);
-lambda = optimize(yfit, W, Z, Q, phi, exp(-9), exp(5), 5e-3);
+[lambda, ~, ~, ~] = findblup(yfit, W, Z, Q, phi, exp(-9), exp(5), optimset('TolX', 5e-3));
 [d, c, rhoMLE, likelihood, M] = kriging(lambda, yfit, W, Z, Q, phi);
 
 delta = 0.1;
@@ -80,11 +81,4 @@ h = pcolor(x, y, reshape(m, nx, ny));
 h.EdgeColor = 'none';
 axis([x1 x2 y1 y2])
 colorbar
-
-function lambda = optimize(y, W, Z, Q, phi, xmin, xmax, tol)
-    function likelihood = LK(l)
-        [~, ~, ~, likelihood] = kriging(exp(l), y, W, Z, Q, phi);
-        likelihood = -likelihood;
-    end
-    lambda = exp(fminbnd(@LK, log(xmin), log(xmax), optimset('FunValCheck', 'on', 'TolX', tol)));
-end
+title('Output')

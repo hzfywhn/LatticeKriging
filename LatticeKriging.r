@@ -227,6 +227,7 @@ if (FALSE) {
     loc <- expand.grid(x0, y0)
     x <- loc[, 1]
     y <- loc[, 2]
+    Z1 <- rep(1, times = nx*ny)
     MR1 <- combineMR(list(loc = cbind(x, y)), basis, normalization, rho, FALSE)
-    pred <- prediction(rep(1, times = nx*ny), MR1$phi1, lambda, Z, MR$Q, MR$phi, fit$M, fit$d, fit$c, fit$rhoMLE)
+    pred <- prediction(Z1, MR1$phi1, lambda, Z, MR$Q, MR$phi, fit$M, fit$d, fit$c, fit$rhoMLE)
 }
