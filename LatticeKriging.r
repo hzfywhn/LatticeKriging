@@ -1,6 +1,5 @@
 # a simplified rewrite of LatticeKrig package on Cartesian geometry
 
-library(package = "rdist")
 library(package = "spam")
 
 SAR <- function(basis) {
@@ -38,7 +37,7 @@ SAR <- function(basis) {
 }
 
 regression <- function(obs, basis, derivative) {
-    d <- cdist(obs$loc, basis$loc) / basis$delta
+    d <- rdist::cdist(obs$loc, basis$loc) / basis$delta
     d[d > 1] <- NA
     if (derivative) {
         r1 <- replicate(n = nrow(basis$loc), expr = rowSums(obs$loc * obs$azim))
@@ -81,7 +80,8 @@ combineMR <- function(obs, basis, normalization, rho, derivative) {
             B1 <- spam(x = B0, nrow = m0[ilev], ncol = m0[ilev])
             Q1 <- t(B1) %*% B1
             phi1 <- spam(x = phi0, nrow = n, ncol = m0[ilev])
-            normweight <- colSums(forwardsolve(chol(Q1), t(phi1))^2)
+            weight <- forwardsolve(chol(Q1), t(phi1))
+            normweight <- diag(t(weight) %*% weight)
             normweight[normweight == 0] <- 1
             phi1 <- diag.spam(x = 1/sqrt(normweight)) %*% phi1
             phi0 <- triplet(phi1, tri = TRUE)
@@ -136,37 +136,40 @@ kriging <- function(lambda, y, W, Z, Q, phi) {
     return (list(d = drop(d), c = drop(c), rhoMLE = drop(rhoMLE), likelihood = drop(likelihood), M = M))
 }
 
-prediction <- function(Z1, phi1, lambda, Z, Q, phi, M, d, c, rhoMLE) {
-    normweight <- colSums(forwardsolve(chol(Q), t(phi1))^2)
-    normweight[normweight == 0] <- 1
+predictMean <- function(Z1, phi1, d, c) {
+    return (drop(Z1 %*% d + phi1 %*% c))
+}
 
-    m <- Z1 %*% d + phi1 %*% c
+predictSD <- function(Z1, phi1, lambda, W, Z, Q, phi, M, rhoMLE) {
+    # standard deviation prediction is confusing with no reference found, use with caution
 
-    # standard deviation prediction is confusing with no reference found
-    # don't trust for now, verification needed
     y1 <- phi %*% solve(Q, t(phi1))
     ZMZ <- t(Z) %*% solve(M, Z)
     d1 <- solve(ZMZ, t(Z)) %*% solve(M, y1)
     r1 <- y1 - Z %*% d1
     c1 <- solve(Q, t(phi)) %*% solve(M, r1)
     residual <- y1 - Z %*% d1 - phi %*% c1
-    joint <- colSums(t(Z1) * solve(ZMZ, t(Z1))) - 2 * colSums(t(Z1) * d1)
-    marginal <- normweight - colSums(y1 * residual) / lambda
-    sd <- sqrt(rhoMLE * abs(joint + marginal))
+    joint <- diag(Z1 %*% solve(ZMZ, t(Z1))) - 2 * diag(Z1 %*% d1)
 
-    return (list(m = drop(m), sd = sd))
+    weight <- forwardsolve(chol(Q), t(phi1))
+    normweight <- diag(t(weight) %*% weight)
+    normweight[normweight == 0] <- 1
+    marginal <- normweight - diag(t(y1) %*% W %*% residual) / lambda
+
+    sd <- sqrt(rhoMLE * abs(joint + marginal))
+    return (sd)
 }
 
 # codes below are for testing
 if (FALSE) {
-    # testing domain
+    # test domain
     x1 <- -4
     x2 <- 4
     y1 <- -2
     y2 <- 2
 
-    # basis set, column major order for comparison with original LatticeKrig package
-    delta <- 0.5
+    # basis set
+    delta <- 0.2
     x0 <- seq(from = x1, to = x2, by = delta)
     y0 <- seq(from = y1, to = y2, by = delta)
     nx <- length(x0)
@@ -189,45 +192,34 @@ if (FALSE) {
     normalization <- FALSE
     rho <- 1
 
-    # fake observation
-    delta <- 0.1
-    loc <- expand.grid(seq(from = x1, to = x2, by = delta), seq(from = y1, to = y2, by = delta))
-    x <- loc[, 1]
-    y <- loc[, 2]
-    z <- 1 / (1 + (x-1)^2 + y^2) - 1 / (1 + (x+1)^2 + y^2)
-    vx <- -2*(x-1) / (1 + (x-1)^2 + y^2)^2 + 2*(x+1) / (1 + (x+1)^2 + y^2)^2
-    vy <- -2*y / (1 + (x-1)^2 + y^2)^2 + 2*y / (1 + (x+1)^2 + y^2)^2
-    n <- length(z)
-    subset <- sample(1: n, size = n/10)
-    n <- length(subset)
-    x <- x(subset)
-    y <- y(subset)
-    z <- z(subset)
-    vx <- vx(subset)
-    vy <- vy(subset)
-    cosx <- rep(1, times = n)
-    cosy <- sqrt(1 - cosx^2)
-    v <- vx*cosx + vy*cosy
+    # observation
+    n <- 1200
+    x <- runif(n, min = x1, max = x2)
+    y <- runif(n, min = y1, max = y2)
+    t <- runif(n, min = 0, max = 2*pi)
 
-    yfit <- v
+    vx <- 2*((x-1)/(1+(x-1)^2+y^2)^2 - (x+1)/(1+(x+1)^2+y^2)^2)
+    vy <- 2*(y/(1+(x-1)^2+y^2)^2 - y/(1+(x+1)^2+y^2)^2)
+
+    yfit <- vx*cos(t) + vy*sin(t)
     W <- diag.spam(x = 1, nrow = n, ncol = n)
-    Z <- rep(1, times = n)
-    MR <- combineMR(list(loc = cbind(x, y), azim = cbind(cosx, cosy)), basis, normalization, rho, TRUE)
-    # interval needs to be adjusted for specific purposes
+    Z <- cos(t)
+
+    MR <- combineMR(list(loc = cbind(x, y), azim = cbind(cos(t), sin(t))), basis, normalization, rho, TRUE)
+    # interval needs to be adjusted for specific cases
     lambda <- exp(optimize(
         function(l) kriging(exp(l), yfit, W, Z, MR$Q, MR$phi)$likelihood,
-        interval = c(-9, 5), maximum = TRUE, tol = 5e-3)$maximum)
+        interval = c(4, 9), maximum = TRUE)$maximum)
     fit <- kriging(lambda, yfit, W, Z, MR$Q, MR$phi)
 
     delta <- 0.1
     x0 <- seq(from = x1, to = x2, by = delta)
     y0 <- seq(from = y1, to = y2, by = delta)
-    nx <- length(x0)
-    ny <- length(y0)
     loc <- expand.grid(x0, y0)
-    x <- loc[, 1]
-    y <- loc[, 2]
-    Z1 <- rep(1, times = nx*ny)
-    MR1 <- combineMR(list(loc = cbind(x, y)), basis, normalization, rho, FALSE)
-    pred <- prediction(Z1, MR1$phi1, lambda, Z, MR$Q, MR$phi, fit$M, fit$d, fit$c, fit$rhoMLE)
+    xo <- loc[, 1]
+    yo <- loc[, 2]
+    Z1 <- as.matrix(xo)
+    MR1 <- combineMR(list(loc = cbind(xo, yo)), basis, normalization, rho, FALSE)
+    m <- predictMean(Z1, MR1$phi, fit$d, fit$c)
+    sd <- predictSD(Z1, MR1$phi, lambda, W, Z, MR$Q, MR$phi, fit$M, fit$rhoMLE)
 }

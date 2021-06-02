@@ -29,10 +29,10 @@ function [Q, phi] = combineMR(obs, basis, normalization, rho, derivative)
             phi1 = sparse(iphi0, jphi0, phi0, n, m0(ilev));
             [Qc, flag] = chol(Q1);
             assert(flag == 0)
-            normweight = sum((Qc' \ phi1').^2, 1);
+            weight = Qc' \ phi1';
+            normweight = diag(weight' * weight);
             normweight(normweight == 0) = 1;
-            ind = 1: length(normweight);
-            phi1 = sparse(ind, ind, 1./sqrt(normweight)) * phi1;
+            phi1 = spdiags(1./sqrt(normweight), 0, n, n) * phi1;
             [iphi0, jphi0, phi0] = find(phi1);
         end
 
