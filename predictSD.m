@@ -10,7 +10,8 @@ function sd = predictSD(Z1, phi1, lambda, W, Z, Q, phi, M, rhoMLE)
     [Qc, flag] = chol(Q);
     assert(flag == 0)
     weight = Qc' \ phi1';
-    normweight = diag(weight' * weight);
+%     normweight = diag(weight' * weight);
+    normweight = sum(weight.^2, 1);
     normweight(normweight == 0) = 1;
     marginal = normweight - diag(y1' * W * residual) / lambda;
 

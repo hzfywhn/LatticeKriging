@@ -81,7 +81,8 @@ combineMR <- function(obs, basis, normalization, rho, derivative) {
             Q1 <- t(B1) %*% B1
             phi1 <- spam(x = phi0, nrow = n, ncol = m0[ilev])
             weight <- forwardsolve(chol(Q1), t(phi1))
-            normweight <- diag(t(weight) %*% weight)
+            # normweight <- diag(t(weight) %*% weight)
+            normweight <- colSums(weight^2)
             normweight[normweight == 0] <- 1
             phi1 <- diag.spam(x = 1/sqrt(normweight)) %*% phi1
             phi0 <- triplet(phi1, tri = TRUE)
@@ -152,7 +153,8 @@ predictSD <- function(Z1, phi1, lambda, W, Z, Q, phi, M, rhoMLE) {
     joint <- diag(Z1 %*% solve(ZMZ, t(Z1))) - 2 * diag(Z1 %*% d1)
 
     weight <- forwardsolve(chol(Q), t(phi1))
-    normweight <- diag(t(weight) %*% weight)
+    # normweight <- diag(t(weight) %*% weight)
+    normweight <- colSums(weight^2)
     normweight[normweight == 0] <- 1
     marginal <- normweight - diag(t(y1) %*% W %*% residual) / lambda
 

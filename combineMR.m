@@ -30,7 +30,8 @@ function [Q, phi] = combineMR(obs, basis, normalization, rho, derivative)
             [Qc, flag] = chol(Q1);
             assert(flag == 0)
             weight = Qc' \ phi1';
-            normweight = diag(weight' * weight);
+%             normweight = diag(weight' * weight);
+            normweight = sum(weight.^2, 1);
             normweight(normweight == 0) = 1;
             phi1 = spdiags(1./sqrt(normweight), 0, n, n) * phi1;
             [iphi0, jphi0, phi0] = find(phi1);
