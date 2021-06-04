@@ -13,7 +13,7 @@ function sd = predictSD(Z1, phi1, lambda, W, Z, Q, phi, M, rhoMLE)
 %     normweight = diag(weight' * weight);
     normweight = sum(weight.^2, 1);
     normweight(normweight == 0) = 1;
-    marginal = normweight - diag(y1' * W * residual) / lambda;
+    marginal = normweight' - diag(y1' * W * residual) / lambda;
 
     sd = sqrt(rhoMLE * abs(joint + marginal));
 end
