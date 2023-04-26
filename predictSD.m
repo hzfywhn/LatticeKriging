@@ -1,4 +1,7 @@
 function sd = predictSD(Z1, phi1, lambda, W, Z, Q, phi, M, rhoMLE)
+% calculate the conditional variance at specified locations given existing observations
+% only support predicting scalar fields for now
+
     y1 = phi * (Q \ phi1');
     ZMZ = Z' * (M \ Z);
     d1 = ZMZ \ Z' * (M \ y1);

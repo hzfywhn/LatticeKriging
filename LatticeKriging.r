@@ -1,10 +1,12 @@
 # a simplified rewrite of LatticeKrig package on Cartesian geometry
+# the control flow is re-designed to reduce function calls
 
 library(package = "spam")
 library(package = "spam64")
 
 SAR <- function(connect, centerweight) {
-# spatial auto-regression (B matrix in triplet form)
+# spatial auto-regression matrix (B) of one level in triplet form
+
     m <- nrow(connect)
     m0 <- ncol(connect)
 
@@ -39,6 +41,7 @@ SAR <- function(connect, centerweight) {
 
 precision <- function(connect, centerweight) {
 # combine all levels to form the full precision matrix
+
     nlev <- length(connect)
 
     m0 <- array(dim = nlev)
@@ -54,6 +57,7 @@ precision <- function(connect, centerweight) {
     for (ilev in 1: nlev) {
         B0 <- SAR(connect[[ilev]], centerweight)
 
+# stack SAR matrices diagonally
         k0 <- length(B0$values)
         iB[k: (k + k0 - 1)] <- B0$i + m1[ilev]
         jB[k: (k + k0 - 1)] <- B0$j + m1[ilev]
@@ -72,12 +76,17 @@ precision <- function(connect, centerweight) {
 }
 
 basis <- function(x, dircos, x0, width) {
-# pair-wise distance between observations and basis functions in triplet form
+# regression matrix of one level in triplet form
+
+# pair-wise distance between observations and basis functions
     d <- rdist::cdist(x, x0) / width
     d[d > 1] <- NA
+
     if (is.null(dircos)) {
+# for scalar modeling, Wendland function is used
         phi <- (1 - d)^6 * (35 * d^2 + 18 * d + 3) / 3
     } else {
+# for vector modeling, line-of-sight projection is performed (useful for curl-free fields)
         r1 <- replicate(n = nrow(x0), expr = rowSums(x * dircos))
         r2 <- dircos %*% t(x0)
         phi <- (1 - d)^5 * (5 * d + 1) * 56 / 3 / width^2 * (r1 - r2)
@@ -89,6 +98,8 @@ basis <- function(x, dircos, x0, width) {
 
 regression <- function(x, dircos, x0, width, alpha, rho) {
 # combine all levels to form the full regression matrix
+# normalization is droped, it is suggested to cover a larger area for the model (sponge)
+
     n <- nrow(x)
     nlev <- length(x0)
 
@@ -105,6 +116,7 @@ regression <- function(x, dircos, x0, width, alpha, rho) {
     for (ilev in 1: nlev) {
         phi0 <- basis(x, dircos, x0[[ilev]], width[ilev])
 
+# stack regression matrices horizontally
         k0 <- length(phi0$values)
         iphi[k: (k + k0 - 1)] <- phi0$i
         jphi[k: (k + k0 - 1)] <- phi0$j + m1[ilev]
@@ -123,6 +135,7 @@ regression <- function(x, dircos, x0, width, alpha, rho) {
 
 kriging <- function(wy, wU, wX, Q, lambda, logdetcov, Gc) {
 # calculate coefficients and likelihood
+
     n <- nrow(wy)
     nreps <- ncol(wy)
 
@@ -147,7 +160,8 @@ kriging <- function(wy, wU, wX, Q, lambda, logdetcov, Gc) {
 LatticeKriging <- function(x, dircos, y, w, Z,
     x0, width, alpha, connect, centerweight, rho,
     xnew, Znew, pred_m, pred_se) {
-# find the best estimate of lambda and predict
+# find the best estimate of lambda and predict fields at new locations
+
     phi <- regression(x, dircos, x0, width, alpha, rho)
     Q <- precision(connect, centerweight)
 
@@ -236,6 +250,7 @@ if (FALSE) {
     connect <- list(con)
     centerweight <- 4.01
 
+    # prediction
     delta <- 0.1
     loc <- expand.grid(seq(from = x1, to = x2, by = delta),
         seq(from = y1, to = y2, by = delta))
